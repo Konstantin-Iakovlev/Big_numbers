@@ -1,6 +1,7 @@
-#include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
+#include <stdio.h>
 typedef  struct bn_s {
     int *body; // Тело большого числа
     int  bodysize; // Размер массива body
@@ -27,50 +28,49 @@ bn *bn_init(bn const *orig){ //копия числа
     copy->bodysize = orig->bodysize;
     copy->sign = orig->sign;
     copy->body = malloc(sizeof(int) * orig->bodysize);
+    if(copy->body == NULL){
+        free(copy);
+        return NULL;
+    }
     for(int i = 0; i < orig->bodysize; i++){ copy->body[i] = orig->body[i];  }
     return copy;
 }
 
 int bn_delete(bn *t){ //освободить память
-    free(t->body);
-    free(t);
+    if(t != NULL) free(t);
     return 0;
 }
 
-static int swap(int *a, int *b){ //поменять местами переменные
+int swap(int *a, int *b){ //поменять местами переменные
     int c = *b;
     *b = *a;
     *a = c;
     return 0;
 }
-static int reverse(int *m, int m_size){  //зеркально отразить массив
+
+int reverse(int *m, int m_size){  //зеркально отразить массив
     for(int i = 0; i < m_size / 2; i++){
         swap( &m[i] , &m[m_size - i - 1] );
     }
     return 0;
 }
 
-static int max (int a, int b){ //максимум из 2 чисел
+int max (int a, int b){ //максимум из 2 чисел
     if( a >= b ){ return a; }
     return b;
 }
 
-/*static int int_to_char(const int number){ //цифра в символ
- const char m[10] = "0123456789";
- return m[number];
- }
- */
-
-/*static radix_to_dec(const char number){ //перевод числа из
- 
- } */
-
-static int char_to_int(const char number){ //символ в цифру
-    int a[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    return a[ number - '0' ];
+int char_to_int(const char number){ //символ в цифру
+    int *a = malloc(10 * sizeof(int) );
+    for(int i = 0; i < 10; i++){
+        a[i] = i;
+    }
+    int res = a[ number - '0' ];
+    free(a);
+    return res;
 }
 
-static int sum(bn *a, bn *b){ //вспомогательная сумма; результат в а
+int sum(bn *a, bn *b){ //вспомогательная сумма; результат в а
     int size = max( a->bodysize, b->bodysize ) + 1;
     bn *b_copy = bn_init(b);
     reverse(a->body, a->bodysize);
@@ -94,7 +94,7 @@ static int sum(bn *a, bn *b){ //вспомогательная сумма; ре�
     return 0;
 }
 
-static int diff(bn *a, bn *b ){ //вспомогательная разность; результат в а
+int diff(bn *a, bn *b ){ //вспомогательная разность; результат в а
     bn *b_copy = bn_init(b);
     reverse(a->body, a->bodysize); //здесь a "длиннее" b
     reverse(b_copy->body, b_copy->bodysize);
@@ -296,7 +296,7 @@ int bn_mul_to(bn *t, bn const *right){ //умножение; результат 
 
 
 
-static int division(bn *t, bn const *right){ //вспомогательное деление; результат t
+int division(bn *t, bn const *right){ //вспомогательное деление; результат t
     bn *ans = bn_new();
     ans->body = realloc(ans->body, t->bodysize * sizeof(int));
     ans->sign = t->sign * right->sign;
@@ -311,7 +311,6 @@ static int division(bn *t, bn const *right){ //вспомогательное д
         int point; //свободное место в current->body
         int copy_progress = progress;
         point = current->bodysize;
-        //  printf("point == %d\n", point);
         
         //дописываем цифры из t в current
         for(int i = copy_progress; i < t->bodysize; i++){
@@ -328,11 +327,6 @@ static int division(bn *t, bn const *right){ //вспомогательное д
                 current->sign = 1; //чтобы cmp работало правильно
             }
             if(current->body[0] == 0 && t->body[i] == 0){ progress++; }
-            // printf("current == ");
-            for(int j = 0; j < point; j++){
-                //  printf("%d", current->body[j]);
-            }
-            // printf("\n");
             
             if(point <= right->bodysize - 1 && ans->body[0] != 0){
                 ans->body[ind] = 0;
@@ -354,17 +348,8 @@ static int division(bn *t, bn const *right){ //вспомогательное д
             current->body[current->bodysize - 1] = t->body[progress];
             progress++;
             
-            // printf("current == ");
-            for(int j = 0; j < current->bodysize; j++){
-                // printf("%d", current->body[j]);
-            }
-            //printf("\n");
-            
             //если мы дописвли хотя бы 1 цифру в цикле for
             if(ans->body[0] != 0 && copy_progress != -1){
-                //  printf("innn 0\n");
-                //  printf("current->bodysize == %d\n", current->bodysize);
-                // printf("progress == %d\n\n", progress);
                 ans->body[ind] = 0;
                 ind++;
             }
@@ -391,17 +376,9 @@ static int division(bn *t, bn const *right){ //вспомогательное д
             copy_right = bn_init(right);
             bn_abs(copy_right);
             bn_mul_to(copy_right, div);
-            // printf("\ncurrent->bodysize = %d\n", current->bodysize);
             int compare = bn_cmp( copy_right , current );
             if( compare <= 0){
                 l = m;
-                // printf("compare == %d\n", compare);
-                // printf("m==%d\n copy_right ", m);
-                for(int j = 0; j < copy_right->bodysize; j++){
-                    // printf("%d", copy_right->body[j]);
-                }
-                //printf("\n");
-                
             }
             if(compare == 1){
                 r = m;
@@ -423,12 +400,6 @@ static int division(bn *t, bn const *right){ //вспомогательное д
         //удалим лишнее
         bn_delete(div);
         bn_delete(copy_right);
-        
-        //printf("ostatok ==");
-        for(int j = 0; j < current->bodysize; j++){
-            // printf("%d", current->body[j]);
-        }
-        //printf("\n");
         
     }
     //присвоим значение t
@@ -552,10 +523,86 @@ int bn_pow_to(bn *t, int degree){ //возведение в степень
     // запишем ответ
     t->sign = ans->sign;
     t->bodysize = ans->bodysize;
-    t->body = realloc(t->body, t->bodysize * sizeof(int) );
-    for(int i = 0; i < t->bodysize; i++){
+    t->body = realloc(t->body, ans->bodysize * sizeof(int) );
+    for(int i = 0; i < ans->bodysize; i++){
         t->body[i] = ans->body[i];
     }
     bn_delete(ans);
     return 0;
+}
+
+int bn_init_string_radix(bn *t, const char *init_string, int radix){ //инициализация строки в сс radix
+    if(init_string[0] == '-'){ t->sign = -1; }
+    if(init_string[0] == '0'){
+        return 0;
+    }
+    
+    char *int_to_string = malloc(sizeof(char) * 36); //массив цифр и латинских букв
+    for(int i = 0; i <= 9; i++){
+        int_to_string[i] = i + '0';
+    }
+    for(int i = 0; i < 26; i++){
+        int_to_string[i + 10] = 'a' + i;
+    }
+    
+    bn *bn_radix = bn_new();
+    bn_init_int(bn_radix, radix);
+    bn *pow = bn_new();
+    bn_init_int(pow, 1);
+    for(int i = strlen(init_string); i >= 0; i--){ //переводим в 10 систему счисления
+        for(int j = 0; j < 36; j++){
+            if(int_to_string[j] == init_string[i]){
+                bn *current = bn_new();
+                bn_init_int(current, j);
+                bn_mul_to(current, pow);
+                bn_add_to(t, current);
+                bn_mul_to(pow, bn_radix);
+                bn_delete(current);
+            }
+        }
+    }
+    bn_delete(bn_radix);
+    bn_delete(pow);
+    return 0;
+}
+
+const char *bn_to_string(bn const *t, int radix){ // представить число в виде строкит в сс  radix
+    int index = 0;
+    if(t->sign == -1){ index = 1; }
+    char *s = calloc( sizeof(char) , t->bodysize + index );
+    if(radix == 10){
+        if(index == 1){ s[0] = '-'; }
+        for(int i = 0; i < t->bodysize; i++){
+            s[i + index] = '0' + t->body[i];
+        }
+        return s;
+    }
+    return s;
+}
+
+int bn_root_to(bn *t, int reciprocal){
+    return 0;
+}
+
+
+///
+int main(){
+    bn *a = bn_new();
+    bn_init_int(a, 0);
+    bn *b = bn_new();
+    bn_init_int(b, 0);
+    
+    bn *c = bn_new();
+    bn_init_int(c, 1000);
+    bn_pow_to(c, 2);
+    
+    const char *s = bn_to_string(c, 10);
+    for(int i= 0; i < c->bodysize; i++){
+        printf("%d ", c->body[i]);
+    }
+    
+    printf("\n\n%s\n", s);
+    printf("%lu\n", strlen(s));
+    printf("c->bodysize %d\n", c->bodysize);
+    printf("\n");
 }
